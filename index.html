@@ -50,7 +50,7 @@
           class="w-full bg-gray-700 text-gray-50 p-4 rounded-lg border border-gray-600 focus:ring-teal-500 focus:border-teal-500 transition duration-150 resize-none"
           placeholder="Paste key observations or features here."></textarea>
 
-        <div class="mt-6">
+        <div class="mt-6 space-y-3">
           <button
             id="classifyButton"
             class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-xl transition duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-teal-500 focus:ring-opacity-50 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
@@ -74,6 +74,17 @@
             </svg>
             Classify Malware Family
           </button>
+
+          <div class="flex gap-3">
+            <button id="exampleBtn" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-3 rounded-md">
+              ✨ Load Example (Worm)
+            </button>
+            <button id="downloadSamples" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-3 rounded-md">
+              📥 Download Sample Inputs
+            </button>
+          </div>
+
+          <p class="text-xs text-gray-400 mt-1">Tip: Paste the analysis summary or a short feature list and click Classify.</p>
         </div>
       </div>
 
@@ -102,39 +113,191 @@
   </div>
 
   <script>
+    // DOM elements
     const featureInput = document.getElementById('featureInput');
     const classifyButton = document.getElementById('classifyButton');
     const resultOutput = document.getElementById('resultOutput');
     const loadingSpinner = document.getElementById('loadingSpinner');
     const statusMessage = document.getElementById('statusMessage');
+    const exampleBtn = document.getElementById('exampleBtn');
+    const downloadBtn = document.getElementById('downloadSamples');
 
-    const sampleReports = [
-      {
-        family: "Ransomware",
-        confidence: "94%",
-        analysis:
-          "The features show strong indicators of ransomware: encryption API usage, file renaming, ransom note creation, and persistence through registry modification.",
-      },
-      {
-        family: "Trojan Downloader",
-        confidence: "88%",
-        analysis:
-          "Detected patterns match downloader behavior: connecting to external servers, fetching executables, and launching new processes remotely.",
-      },
-      {
-        family: "Adware",
-        confidence: "81%",
-        analysis:
-          "Features indicate advertisement injection activity, frequent browser hooks, and pop-up windows creation for third-party promotions.",
-      },
-      {
-        family: "Spyware",
-        confidence: "89%",
-        analysis:
-          "The malware collects user data, monitors keystrokes, and communicates with C2 servers — consistent with spyware traits.",
-      },
-    ];
+    // default example text
+    const defaultExample = `- Imports: wsock32.dll, netapi32.dll
+- Behavior: Scans for open ports and copies itself to shared network folders
+- Persistence: Creates registry entries for auto-execution on new systems
+- Network: Attempts to spread via SMB and FTP protocols
+`;
 
+    // sample inputs file content (downloadable)
+    const sampleInputsText = `# Sample Inputs for Malware Feature Analyst
+
+--- Ransomware
+- Imports: advapi32.dll, CryptEncrypt, kernel32.dll
+- Behavior: Searches for user files (.doc, .pdf, .jpg) and encrypts them using AES
+- Persistence: Adds a startup entry in registry for execution on boot
+- Network: Sends encryption key to remote server over HTTPS
+
+--- Trojan Downloader
+- Imports: urlmon.dll, wininet.dll
+- Behavior: Downloads and executes external payloads from remote server
+- Persistence: Creates registry Run key for auto-launch
+- Network: Connects to multiple IPs and fetches new executables
+
+--- Rootkit
+- Imports: ntdll.dll, psapi.dll
+- Behavior: Hooks system APIs to hide running processes and files
+- Persistence: Installs kernel driver for stealth operation
+- Network: Communicates with hidden command server for remote access
+
+--- Spyware
+- Imports: user32.dll, gdi32.dll
+- Behavior: Captures screenshots, clipboard data, and keystrokes
+- Persistence: Runs silently in background with obfuscated process name
+- Network: Exfiltrates data to external server every 5 minutes
+
+--- Keylogger
+- Imports: user32.dll, kernel32.dll
+- Behavior: Records keyboard inputs and stores logs in hidden directory
+- Persistence: Runs in stealth mode via scheduled task
+- Network: Sends collected logs to attacker-controlled domain
+
+--- Worm
+- Imports: wsock32.dll, netapi32.dll
+- Behavior: Scans for open ports and copies itself to shared network folders
+- Persistence: Creates registry entries for auto-execution on new systems
+- Network: Attempts to spread via SMB and FTP protocols
+
+--- Benign Example
+- Imports: user32.dll, kernel32.dll
+- Behavior: Opens standard GUI window and reads user input
+- Persistence: None
+- Network: Connects to official update server for version check
+`;
+
+    // Utility: download text as file
+    function downloadText(filename, text) {
+      const blob = new Blob([text], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    downloadBtn.addEventListener('click', () => {
+      downloadText('sample_inputs.txt', sampleInputsText);
+    });
+
+    exampleBtn.addEventListener('click', () => {
+      featureInput.value = defaultExample;
+      statusMessage.classList.add('hidden');
+      resultOutput.innerHTML = `<p class="text-gray-400 italic">Example loaded. Click 'Classify' to analyze.</p>`;
+    });
+
+    /* ---------------- Deterministic rule-based classifier ---------------- */
+
+    function scoreAndClassify(text) {
+      const t = text.toLowerCase();
+
+      // feature checks (case-insensitive)
+      const uses_wsock = /wsock32\.dll|ws2_32\.dll|winsock/i.test(t);
+      const uses_netapi = /netapi32\.dll|netapi/i.test(t);
+      const scans_ports = /scan(s)?\s+for|scan.*port|scans.*ports|port scan/i.test(t);
+      const copies_shared = /copy|copies|copy.*shared|shared folder|copy to shared|copy.*network/i.test(t);
+      const smb_ftp = /\\bsmb\\b|smbv|samba|\\bftp\\b|ftp protocol|\\bsmb2\\b/i.test(t);
+      const persistence_registry = /registry|run key|creates registry|create.*registry|auto-?execution/i.test(t);
+      const downloads = /download|fetch|downloader|downloads executables|fetches executables/i.test(t);
+      const ads = /ad(server)?|advert|pop-?up|ad injection|injects advertisements/i.test(t);
+      const encrypts = /encrypt|encryption|crypt(encrypt|decrypt)/i.test(t);
+      const keylog = /keylog|keystroke|keyboard hook|keylogger/i.test(t);
+      const hide_process = /hide|hide.*process|hook|hooking|api hook/i.test(t);
+
+      // base scores (tunable)
+      const scores = {
+        "Worm": 0,
+        "Rootkit": 0,
+        "Ransomware": 0,
+        "Trojan Downloader": 0,
+        "Adware": 0,
+        "Spyware": 0,
+        "Keylogger": 0,
+        "Benign/Unknown": 0
+      };
+
+      // Worm indicators
+      if (uses_wsock) scores["Worm"] += 2;
+      if (uses_netapi) scores["Worm"] += 2;
+      if (scans_ports) scores["Worm"] += 3;
+      if (copies_shared) scores["Worm"] += 3;
+      if (smb_ftp) scores["Worm"] += 2;
+      if (persistence_registry) scores["Worm"] += 1;
+
+      // Rootkit indicators
+      if (/ntdll\.dll|psapi\.dll/i.test(t)) scores["Rootkit"] += 2;
+      if (hide_process) scores["Rootkit"] += 3;
+      if (/kernel driver|driver install|kernel-mode/i.test(t)) scores["Rootkit"] += 3;
+
+      // Ransomware indicators
+      if (encrypts) scores["Ransomware"] += 4;
+      if (persistence_registry) scores["Ransomware"] += 1;
+
+      // Downloader indicators
+      if (downloads) scores["Trojan Downloader"] += 3;
+      if (/urlmon|wininet|urlopen/i.test(t)) scores["Trojan Downloader"] += 1;
+
+      // Adware indicators
+      if (ads) scores["Adware"] += 4;
+      if (/browser hook|injects advertisements|adserver/i.test(t)) scores["Adware"] += 1;
+
+      // Spyware / Keylogger
+      if (keylog) scores["Keylogger"] += 4;
+      if (/screenshot|clipboard|exfiltrate|exfiltrates/i.test(t)) scores["Spyware"] += 3;
+
+      // choose best
+      let best = "Benign/Unknown";
+      let bestScore = -1;
+      for (const k in scores) {
+        if (scores[k] > bestScore) {
+          best = k;
+          bestScore = scores[k];
+        }
+      }
+
+      // compute confidence (scale bestScore -> percent)
+      // assume max meaningful score ~10 (tunable)
+      let confidencePct = 50;
+      if (bestScore > 0) {
+        confidencePct = Math.min(99, Math.round((bestScore / 10) * 100));
+        if (confidencePct < 65) confidencePct = 65;
+      } else {
+        best = "Benign/Unknown";
+        confidencePct = 50;
+      }
+
+      // human-readable analyses
+      const analysisMap = {
+        "Worm": "Network scanning and propagation behavior (port scanning, copying to shared folders, SMB/FTP spread) indicate a worm designed to self-replicate across networks.",
+        "Rootkit": "API hooking and kernel-level modifications to hide processes indicate a rootkit with stealth capabilities.",
+        "Ransomware": "File encryption behavior and crypto API usage indicate ransomware intent to encrypt user data for extortion.",
+        "Trojan Downloader": "Network fetching of executables and remote payload execution indicate downloader behavior.",
+        "Adware": "Ad injections, browser hooks, and frequent connections to adservers indicate adware activity.",
+        "Spyware": "Data collection (screenshots, clipboard, keylogging) and periodic exfiltration behavior indicate spyware.",
+        "Keylogger": "Keyboard hooks and hidden logging routines are consistent with a keylogger.",
+        "Benign/Unknown": "No strong malicious indicators matched the heuristics; manual analysis recommended."
+      };
+
+      return {
+        family: best,
+        confidence: `${confidencePct}%`,
+        analysis: analysisMap[best] || "Suspicious behavior matched heuristic rules."
+      };
+    }
+
+    // Handler
     classifyButton.addEventListener('click', () => {
       const features = featureInput.value.trim();
       if (!features) {
@@ -149,29 +312,44 @@
       resultOutput.innerHTML = `<p class="text-teal-400 italic">Analyzing features... please wait.</p>`;
 
       setTimeout(() => {
-        const randomReport = sampleReports[Math.floor(Math.random() * sampleReports.length)];
+        const result = scoreAndClassify(features);
 
+        // render nicely
         resultOutput.innerHTML = `
           <div class="space-y-4">
-            <p class="text-3xl font-bold text-red-400">Classification: ${randomReport.family}</p>
-            <p class="text-xl font-semibold text-teal-400">Confidence: ${randomReport.confidence}</p>
-            <p class="text-lg font-semibold mt-6 text-gray-200">Malware Analysis Report:</p>
-            <div class="text-gray-300 whitespace-pre-wrap">${randomReport.analysis}</div>
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-3xl font-bold text-red-400">Classification: ${escapeHtml(result.family)}</p>
+                <p class="text-xl font-semibold text-teal-400 mt-1">Confidence: ${escapeHtml(result.confidence)}</p>
+              </div>
+              <div class="text-right">
+                <div class="w-48 bg-gray-700 rounded-full h-4 overflow-hidden">
+                  <div style="width:${parseInt(result.confidence)}%" class="h-4 bg-teal-400"></div>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">Confidence visual</p>
+              </div>
+            </div>
+
+            <p class="text-lg font-semibold mt-2 text-gray-200">Malware Analysis Report:</p>
+            <div class="text-gray-300 whitespace-pre-wrap border-l-2 border-gray-700 pl-3">${escapeHtml(result.analysis)}</div>
           </div>
         `;
 
         classifyButton.disabled = false;
         loadingSpinner.classList.add('hidden');
-      }, 1200);
+      }, 700);
     });
 
-    // Example input text
-    featureInput.value = `
-- Imports: advapi32.dll, CryptEncrypt
-- Behavior: Searches for user files (.doc, .pdf) and encrypts them
-- Persistence: Creates a Run key in the registry
-- Network: Connects to a remote server on port 443
-`;
+    // small helper to escape HTML (avoid injection if users paste weird input)
+    function escapeHtml(text) {
+      return text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    // pre-fill sample content
+    featureInput.value = defaultExample;
   </script>
 </body>
 </html>
