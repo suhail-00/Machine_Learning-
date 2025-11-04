@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Malware Feature Analyst</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1f2937;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #4b5563;
+      border-radius: 10px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #6b7280;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 min-h-screen text-white p-4 sm:p-8">
+  <div class="max-w-4xl mx-auto">
+    <!-- Header -->
+    <header class="text-center mb-10">
+      <h1 class="text-4xl sm:text-5xl font-extrabold text-teal-400 mb-2">
+        Malware Feature Analyst
+      </h1>
+      <p class="text-gray-400 text-lg">
+        Simulate a Security Pipeline: Features analyzed by a secure AI process.
+      </p>
+    </header>
+
+    <!-- Main Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <!-- Input Panel -->
+      <div class="bg-gray-800 p-6 rounded-xl shadow-2xl h-full">
+        <h2 class="text-2xl font-semibold mb-4 text-gray-200">1. Input Analysis Data</h2>
+
+        <textarea
+          id="featureInput"
+          rows="8"
+          class="w-full bg-gray-700 text-gray-50 p-4 rounded-lg border border-gray-600 focus:ring-teal-500 focus:border-teal-500 transition duration-150 resize-none"
+          placeholder="Paste key observations or features here."></textarea>
+
+        <div class="mt-6">
+          <button
+            id="classifyButton"
+            class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-xl transition duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-teal-500 focus:ring-opacity-50 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+            <svg
+              id="loadingSpinner"
+              class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24">
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Classify Malware Family
+          </button>
+        </div>
+      </div>
+
+      <!-- Output Panel -->
+      <div class="bg-gray-800 p-6 rounded-xl shadow-2xl lg:h-full lg:overflow-y-auto">
+        <h2 class="text-2xl font-semibold mb-4 text-gray-200">2. Classification Result</h2>
+
+        <div
+          id="resultOutput"
+          class="bg-gray-900 p-4 rounded-lg border border-gray-700 min-h-72">
+          <p class="text-gray-400 italic">
+            Input features above and click 'Classify' to receive the simulated analysis.
+          </p>
+        </div>
+
+        <div id="statusMessage" class="mt-4 text-sm text-red-400 hidden"></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="mt-10 text-center text-gray-500 text-sm">
+      <p class="text-gray-400">
+        Offline Demo | Malware Classification Simulation by Suhail 🔐
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    const featureInput = document.getElementById('featureInput');
+    const classifyButton = document.getElementById('classifyButton');
+    const resultOutput = document.getElementById('resultOutput');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const statusMessage = document.getElementById('statusMessage');
+
+    const sampleReports = [
+      {
+        family: "Ransomware",
+        confidence: "94%",
+        analysis:
+          "The features show strong indicators of ransomware: encryption API usage, file renaming, ransom note creation, and persistence through registry modification.",
+      },
+      {
+        family: "Trojan Downloader",
+        confidence: "88%",
+        analysis:
+          "Detected patterns match downloader behavior: connecting to external servers, fetching executables, and launching new processes remotely.",
+      },
+      {
+        family: "Adware",
+        confidence: "81%",
+        analysis:
+          "Features indicate advertisement injection activity, frequent browser hooks, and pop-up windows creation for third-party promotions.",
+      },
+      {
+        family: "Spyware",
+        confidence: "89%",
+        analysis:
+          "The malware collects user data, monitors keystrokes, and communicates with C2 servers — consistent with spyware traits.",
+      },
+    ];
+
+    classifyButton.addEventListener('click', () => {
+      const features = featureInput.value.trim();
+      if (!features) {
+        statusMessage.textContent = "Please paste some analysis data before classifying.";
+        statusMessage.classList.remove('hidden');
+        return;
+      }
+
+      statusMessage.classList.add('hidden');
+      classifyButton.disabled = true;
+      loadingSpinner.classList.remove('hidden');
+      resultOutput.innerHTML = `<p class="text-teal-400 italic">Analyzing features... please wait.</p>`;
+
+      setTimeout(() => {
+        const randomReport = sampleReports[Math.floor(Math.random() * sampleReports.length)];
+
+        resultOutput.innerHTML = `
+          <div class="space-y-4">
+            <p class="text-3xl font-bold text-red-400">Classification: ${randomReport.family}</p>
+            <p class="text-xl font-semibold text-teal-400">Confidence: ${randomReport.confidence}</p>
+            <p class="text-lg font-semibold mt-6 text-gray-200">Malware Analysis Report:</p>
+            <div class="text-gray-300 whitespace-pre-wrap">${randomReport.analysis}</div>
+          </div>
+        `;
+
+        classifyButton.disabled = false;
+        loadingSpinner.classList.add('hidden');
+      }, 1200);
+    });
+
+    // Example input text
+    featureInput.value = `
+- Imports: advapi32.dll, CryptEncrypt
+- Behavior: Searches for user files (.doc, .pdf) and encrypts them
+- Persistence: Creates a Run key in the registry
+- Network: Connects to a remote server on port 443
+`;
+  </script>
+</body>
+</html>
